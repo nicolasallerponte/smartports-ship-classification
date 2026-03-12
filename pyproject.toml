@@ -1,7 +1,7 @@
 [project]
-name = "p1"
+name = "smartports-cv"
 version = "0.1.0"
-description = "Add your description here"
+description = "Port CCTV image classification for ship detection and docking status"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -22,13 +22,11 @@ dev = [
     "ipykernel>=7.2.0",
     "ipywidgets>=8.1.8",
     "jupyter>=1.1.1",
-    "p1",
 ]
 
-[tool.uv.workspace]
-members = [
-    ".",
-]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.uv.sources]
-p1 = { workspace = true, editable = true }
+[tool.hatch.build.targets.wheel]
+packages = ["src/smartports"]
