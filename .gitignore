@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+outputs/checkpoints/
+*.pt
+*.pth
+data/images/
+EOF
