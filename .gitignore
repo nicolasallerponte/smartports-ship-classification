@@ -7,3 +7,4 @@ outputs/checkpoints/
 *.pth
 data/images/
 EOF
+outputs/checkpoints/
