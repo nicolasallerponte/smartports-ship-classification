@@ -1,3 +1,4 @@
+import json
 import torch
 import numpy as np
 import pandas as pd
@@ -11,10 +12,11 @@ from smartports.dataset import SmartportsDataset
 from smartports.transforms import get_transforms
 from smartports.models import get_model, unfreeze_backbone
 from smartports.train import train_one_epoch, evaluate_loader, EarlyStopping
-from smartports.evaluate import compute_metrics, plot_training_history, plot_fold_results, plot_summary
+from smartports.evaluate import compute_metrics, plot_training_history, plot_fold_results, plot_summary, plot_mean_std_history
 
 
 # Config
+
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 DEFAULT_CFG = {
@@ -44,11 +46,16 @@ def run_fold(
     figures_dir: Path,
     ckpt_dir:    Path,
     save_plots:  bool = True,
-) -> dict:
+) -> tuple[dict, dict]:
+    """
+    Trains and evaluates a single fold.
+
+    Returns:
+        Tuple of (metrics dict, history dict).
+    """
     print(f'\n  Fold {fold + 1} | model={model_name} | augment={augment}')
     print(f'  train={len(train_idx)}  val={len(val_idx)}  test={len(test_idx)}')
 
-    # Datasets
     train_ds = SmartportsDataset(
         csv_path  = dataset_cfg['csv_path'],
         img_dir   = dataset_cfg['img_dir'],
@@ -78,7 +85,6 @@ def run_fold(
     test_loader  = DataLoader(test_ds,  batch_size=cfg['batch_size'], shuffle=False,
                               num_workers=cfg['num_workers'], pin_memory=True)
 
-    # Model
     is_resnet = model_name == 'resnet18'
     model     = get_model(model_name, freeze_backbone=is_resnet).to(DEVICE)
 
@@ -89,10 +95,9 @@ def run_fold(
     pos_weight = torch.tensor([dataset_cfg.get('pos_weight', 1.0)]).to(DEVICE)
     criterion  = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
-    ckpt_path     = ckpt_dir / f'{model_name}_aug{augment}_fold{fold + 1}.pt'
+    ckpt_path      = ckpt_dir / f'{model_name}_aug{augment}_fold{fold + 1}.pt'
     early_stopping = EarlyStopping(patience=cfg['patience'], path=str(ckpt_path))
 
-    # Training loop
     history    = {'train_loss': [], 'val_loss': [], 'train_acc': [], 'val_acc': []}
     best_epoch = 1
 
@@ -102,8 +107,8 @@ def run_fold(
             optimizer = torch.optim.Adam(model.parameters(), lr=cfg['lr_resnet'])
             print(f'  → Backbone unfrozen at epoch {epoch}')
 
-        train_loss, train_acc          = train_one_epoch(model, train_loader, optimizer, criterion, DEVICE)
-        val_loss, val_acc, _, _        = evaluate_loader(model, val_loader, criterion, DEVICE)
+        train_loss, train_acc   = train_one_epoch(model, train_loader, optimizer, criterion, DEVICE)
+        val_loss, val_acc, _, _ = evaluate_loader(model, val_loader, criterion, DEVICE)
 
         scheduler.step(val_loss)
 
@@ -125,6 +130,12 @@ def run_fold(
 
     history['best_epoch'] = best_epoch
 
+    # Save history to disk
+    exp_name     = f'{model_name}_aug{augment}_{dataset_cfg["task"]}'
+    history_path = ckpt_dir / f'{exp_name}_fold{fold + 1}_history.json'
+    with open(history_path, 'w') as f:
+        json.dump(history, f)
+
     # Evaluate test with best checkpoint
     model.load_state_dict(torch.load(ckpt_path, map_location=DEVICE))
     _, _, test_labels, test_probs = evaluate_loader(model, test_loader, criterion, DEVICE)
@@ -134,20 +145,17 @@ def run_fold(
     metrics['fpr'] = fpr.tolist()
     metrics['tpr'] = tpr.tolist()
 
-    # Plots
     task        = dataset_cfg['task']
     class_names = ['No Ship', 'Ship'] if task == 'ship' else ['Undocked', 'Docked']
-    exp_name    = f'{model_name}_aug{augment}_{task}'
 
     if save_plots:
         plot_training_history(history, fold, exp_name, figures_dir)
         plot_fold_results(test_labels, test_probs, metrics, fold, exp_name, class_names, figures_dir)
 
-    return metrics
+    return metrics, history
 
 
 # Full K-Fold experiment
-
 
 def run_experiment(
     csv_path:   Path,
@@ -162,20 +170,6 @@ def run_experiment(
 ) -> pd.DataFrame:
     """
     Runs full K-Fold cross-validation for a given model, task, and augmentation setting.
-
-    Args:
-        csv_path   : Path to labels CSV.
-        img_dir    : Path to images directory.
-        task       : 'ship' or 'docked'.
-        model_name : 'simplecnn', 'convnext', or 'resnet18'.
-        augment    : Whether to use data augmentation.
-        pos_weight : BCEWithLogitsLoss positive class weight.
-        cfg        : Training hyperparameters dict.
-        output_dir : Root output directory.
-        save_plots : Whether to generate and save figures.
-
-    Returns:
-        DataFrame with per-fold metrics + mean and std rows.
     """
     figures_dir = output_dir / 'figures'
     results_dir = output_dir / 'results'
@@ -201,8 +195,9 @@ def run_experiment(
         random_state = cfg['random_state'],
     )
 
-    exp_name    = f'{model_name}_aug{augment}_{task}'
-    all_metrics = []
+    exp_name      = f'{model_name}_aug{augment}_{task}'
+    all_metrics   = []
+    all_histories = []
 
     print(f'\n{"="*60}')
     print(f'Experiment : {exp_name}')
@@ -218,7 +213,7 @@ def run_experiment(
             random_state = cfg['random_state'],
         )
 
-        metrics = run_fold(
+        metrics, history = run_fold(
             fold        = fold,
             train_idx   = train_idx,
             val_idx     = val_idx,
@@ -232,12 +227,14 @@ def run_experiment(
             save_plots  = save_plots,
         )
         all_metrics.append(metrics)
+        all_histories.append(history)
 
     # Summary
+    metric_keys = ['acc', 'f1', 'auc_roc', 'auc_pr', 'precision', 'recall', 'specificity']
     if save_plots:
         summary = plot_summary(all_metrics, exp_name, figures_dir)
+        plot_mean_std_history(all_histories, exp_name, figures_dir)
     else:
-        metric_keys = ['acc', 'f1', 'auc_roc', 'auc_pr', 'precision', 'recall', 'specificity']
         summary = {}
         for k in metric_keys:
             vals = [m[k] for m in all_metrics]
@@ -245,7 +242,6 @@ def run_experiment(
             summary[f'{k}_std']  = float(np.std(vals))
 
     # Results dataframe
-    metric_keys = ['acc', 'f1', 'auc_roc', 'auc_pr', 'precision', 'recall', 'specificity']
     rows = []
     for i, m in enumerate(all_metrics):
         row = {'fold': i + 1}
