@@ -37,7 +37,7 @@ def plot_training_history(
     epochs = range(1, len(history['train_loss']) + 1)
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 4))
-    fig.suptitle(f'{model_name} — Fold {fold + 1} Training History', fontsize=13, fontweight='bold')
+    fig.suptitle(f'{model_name} - Fold {fold + 1} Training History', fontsize=13, fontweight='bold')
 
     axes[0].plot(epochs, history['train_loss'], label='Train', color='#5b8db8', linewidth=2)
     axes[0].plot(epochs, history['val_loss'],   label='Val',   color='#e07b54', linewidth=2)
@@ -83,7 +83,7 @@ def plot_mean_std_history(
     epochs = range(1, min_len + 1)
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f'{model_name} — Mean ± Std across {len(histories)} folds',
+    fig.suptitle(f'{model_name} - Mean ± Std across {len(histories)} folds',
                  fontsize=13, fontweight='bold')
 
     for ax, train, val, ylabel, title in [
@@ -132,7 +132,7 @@ def plot_fold_results(
     probs_arr  = np.array(probs)
 
     fig = plt.figure(figsize=(18, 10))
-    fig.suptitle(f'{model_name} — Fold {fold + 1} Test Evaluation\n'
+    fig.suptitle(f'{model_name} - Fold {fold + 1} Test Evaluation\n'
                  f'Acc={metrics["acc"]:.3f}  F1={metrics["f1"]:.3f}  '
                  f'AUC-ROC={metrics["auc_roc"]:.3f}  AUC-PR={metrics["auc_pr"]:.3f}',
                  fontsize=13, fontweight='bold')
@@ -212,7 +212,7 @@ def plot_summary(
         summary[f'{k}_std']  = float(np.std(vals))
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle(f'{model_name} — K-Fold Summary ({len(all_metrics)} folds)',
+    fig.suptitle(f'{model_name} - K-Fold Summary ({len(all_metrics)} folds)',
                  fontsize=13, fontweight='bold')
 
     metric_names = ['Accuracy', 'F1', 'AUC-ROC', 'AUC-PR', 'Precision', 'Recall', 'Specificity']
@@ -235,7 +235,7 @@ def plot_summary(
                          alpha=0.7, label=f"Fold {i+1} (AUC={m['auc_roc']:.3f})")
     axes[1].plot([0, 1], [0, 1], 'k--', linewidth=1)
     axes[1].set_xlabel('False Positive Rate'); axes[1].set_ylabel('True Positive Rate')
-    axes[1].set_title('ROC Curves — All Folds')
+    axes[1].set_title('ROC Curves - All Folds')
     axes[1].legend(fontsize=8); axes[1].grid(True, alpha=0.3)
 
     plt.tight_layout()

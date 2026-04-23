@@ -65,11 +65,11 @@ class ConvNeXtBlock(nn.Module):
 
     def __init__(self, dim: int, layer_scale: float = 1e-6):
         super().__init__()
-        self.dwconv  = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim)
-        self.norm    = nn.LayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(dim, 4 * dim)
+        self.dwconv  = nn.Conv2d(dim, dim, kernel_size=7, padding=3, groups=dim) # Different filter for features
+        self.norm    = nn.LayerNorm(dim, eps=1e-6) 
+        self.pwconv1 = nn.Linear(dim, 4 * dim) # Channel expansion
         self.act     = nn.GELU()
-        self.pwconv2 = nn.Linear(4 * dim, dim)
+        self.pwconv2 = nn.Linear(4 * dim, dim) # Channel reduction
         self.gamma   = nn.Parameter(layer_scale * torch.ones(dim)) if layer_scale > 0 else None
 
     def forward(self, x):
@@ -125,12 +125,12 @@ class MiniConvNeXt(nn.Module):
 
         for i in range(4):
             stage = nn.Sequential(*[ConvNeXtBlock(dims[i]) for _ in range(depths[i])])
-            self.stages.append(stage)
+            self.stages.append(stage) # Feature extraction
             if i < 3:
                 self.downsamples.append(nn.Sequential(
                     _LayerNorm2d(dims[i]),
                     nn.Conv2d(dims[i], dims[i + 1], kernel_size=2, stride=2),
-                ))
+                )) # Downsampling
 
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
@@ -150,7 +150,7 @@ class MiniConvNeXt(nn.Module):
         return x
 
 
-# ResNet18 — pretrained on ImageNet, fine-tuned
+# ResNet18 - pretrained on ImageNet, fine-tuned
 
 def get_resnet18(freeze_backbone: bool = True) -> nn.Module:
     """

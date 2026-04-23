@@ -18,7 +18,7 @@ class SmartportsDataset(Dataset):
     Args:
         csv_path   : Path to the labels CSV file (semicolon-separated).
         img_dir    : Directory containing the images.
-        task       : Classification task — 'ship' or 'docked'.
+        task       : Classification task - 'ship' or 'docked'.
         indices    : Optional list of integer indices to subset the dataset
                      (used for K-Fold train/val/test splits).
         transform  : Optional torchvision transform pipeline to apply.
@@ -70,5 +70,5 @@ class SmartportsDataset(Dataset):
         return img, label
 
     def get_labels(self) -> list[int]:
-        """Returns all labels — used by StratifiedKFold."""
+        """Returns all labels - used by StratifiedKFold."""
         return self.df['label'].tolist()
